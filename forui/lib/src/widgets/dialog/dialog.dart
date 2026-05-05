@@ -482,15 +482,45 @@ class _FDialogState extends State<FDialog> {
     final style = widget.style(context.theme.dialogStyle);
     final direction = Directionality.maybeOf(context) ?? TextDirection.ltr;
 
-    Widget dialog = DecoratedBox(
-      decoration: style.decoration,
-      child: widget.clipBehavior == .none
-          ? widget.builder(context, style)
-          : ClipPath(
-              clipBehavior: widget.clipBehavior,
-              clipper: InnerPathClipper(decoration: style.decoration, direction: direction),
-              child: widget.builder(context, style),
-            ),
+    // Sportity fork patch — see PATCHES.md ("Dialog: barrier-leak guard").
+    //
+    // Wrap the dialog content in an opaque `Listener` that consumes pointer
+    // events on the dialog's bounds before they bubble up to the
+    // `FAnimatedModalBarrier` rendered behind it.
+    //
+    // Why this is needed: a child popover (e.g. a `FPopoverMenu` opened
+    // inside the dialog) installs a `TapRegion` whose `onTapOutside`
+    // closes the popover on outside taps. On Flutter Web the
+    // `TapRegion.onTapOutside` callback is *notification only* — it does
+    // not consume the underlying pointer event. The same tap therefore
+    // continues propagating up the hit-test stack and reaches the modal
+    // barrier behind the dialog, which calls `Navigator.pop` and dismisses
+    // the entire dialog. Net effect: tap-anywhere-in-the-dialog (after
+    // opening then dismissing a popover) closes the dialog.
+    //
+    // A `Listener` with `HitTestBehavior.opaque` and a no-op
+    // `onPointerDown` intercepts the event at the render layer, so the
+    // barrier never sees it. Pointer events that originate from widgets
+    // *inside* the dialog body still work because Flutter dispatches
+    // pointer events to the deepest hit child first.
+    //
+    // Repro for upstream PR: open an `FDialog` containing a popover-menu
+    // button; tap the button to open the popover; tap on empty area
+    // inside the dialog → dialog disappears. With this Listener the
+    // popover closes but the dialog stays.
+    Widget dialog = Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) {},
+      child: DecoratedBox(
+        decoration: style.decoration,
+        child: widget.clipBehavior == .none
+            ? widget.builder(context, style)
+            : ClipPath(
+                clipBehavior: widget.clipBehavior,
+                clipper: InnerPathClipper(decoration: style.decoration, direction: direction),
+                child: widget.builder(context, style),
+              ),
+      ),
     );
 
     // We cannot handle the transition in [FDialogRoute] because of https://github.com/flutter/flutter/issues/31706.
