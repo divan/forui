@@ -147,12 +147,29 @@ class Navigation extends StatelessWidget {
         children: [
           Padding(
             padding: const .directional(start: 7),
-            child: FButton.icon(style: style.buttonStyle, onPress: onPrevious, child: style.previousIcon(context)),
+            // Sportity fork patch — see PATCHES.md ("Calendar header:
+            // semanticsLabel on prev/next chevrons"). FButton.icon with no
+            // visible text exposes nothing to assistive tech / e2e tooling.
+            // Hard-coded English here matches forui's convention for other
+            // chrome strings; localize via FCalendarLocalizations once
+            // upstream wires the prev/next labels through.
+            child: FButton.icon(
+              style: style.buttonStyle,
+              onPress: onPrevious,
+              semanticsLabel: 'Previous month',
+              child: style.previousIcon(context),
+            ),
           ),
           const Expanded(child: SizedBox()),
           Padding(
             padding: const .directional(end: 7),
-            child: FButton.icon(style: style.buttonStyle, onPress: onNext, child: style.nextIcon(context)),
+            // Sportity fork patch — see comment on the previous chevron.
+            child: FButton.icon(
+              style: style.buttonStyle,
+              onPress: onNext,
+              semanticsLabel: 'Next month',
+              child: style.nextIcon(context),
+            ),
           ),
         ],
       ),
