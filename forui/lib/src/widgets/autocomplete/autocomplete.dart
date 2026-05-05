@@ -1346,10 +1346,30 @@ class _State<T> extends State<FAutocomplete<T>> with TickerProviderStateMixin {
     // Focus gained by taps are tracked using this Listener. We cannot use FTextField's onTap method since it is called
     // AFTER its focus change callback. Subsequently the entire text is selected in the focus change callback only if
     // it is not caused by a tap.
+    // Sportity fork patch — see PATCHES.md ("Autocomplete: web focus on
+    // semantic-tap path"). Forces _fieldFocus.requestFocus() in two
+    // places — at pointerDown and at FTextFormField.onTap — and swallows
+    // onTapOutside while the suggestions popover is shown (see the
+    // onTapOutside callback below).
+    //
+    // Why it's needed: on Flutter Web a tap that is delivered through
+    // the accessibility/semantics layer (e.g. assistive tech, Maestro
+    // Web e2e tooling, certain DOM event paths) lands on FTextFormField
+    // and invokes its onTap callback WITHOUT first establishing
+    // EditableText focus. Result: the popover opens but subsequent text
+    // input never reaches the controller because the EditableText is
+    // not focused. The user sees an open suggestions panel and a dead
+    // text field.
+    //
+    // The standard pointer-event path works because Flutter handles
+    // focus on first pointerDown. This patch makes the semantic-tap
+    // path behave the same way by explicitly requesting focus before
+    // showing the popover.
     return Listener(
       onPointerDown: (_) {
         if (!_fieldFocus.hasFocus) {
           _tapFocus = true;
+          _fieldFocus.requestFocus();
         }
       },
       child: FTextFormField(
@@ -1382,8 +1402,39 @@ class _State<T> extends State<FAutocomplete<T>> with TickerProviderStateMixin {
         showCursor: widget.showCursor,
         maxLength: widget.maxLength,
         maxLengthEnforcement: widget.maxLengthEnforcement,
-        onTap: _toggle,
+        onTap: () {
+          // Sportity fork patch — semantic-tap path ensures focus before
+          // toggling the popover; see Listener wrapper above for the
+          // full rationale.
+          if (!_fieldFocus.hasFocus) {
+            _fieldFocus.requestFocus();
+          }
+          _toggle();
+        },
         onTapAlwaysCalled: true,
+        // Sportity fork patch — swallow onTapOutside while the suggestions
+        // popover is shown. The popover is wrapped in TextFieldTapRegion, so
+        // ordinary pointer taps inside it should already count as "inside"
+        // the field's tap region; this is a web fallback for event paths
+        // (semantic taps from the accessibility layer, certain DOM paths)
+        // that still arrive as outside taps and would blur the field /
+        // dismiss the keyboard mid-selection. When the popover is hidden,
+        // mirror EditableText's default tap-outside behavior (the default is
+        // unreachable from here — its action is registered inside
+        // EditableText itself): unfocus, except for touch taps on native
+        // mobile.
+        onTapOutside: (event) {
+          if (_popoverController.status.isForwardOrCompleted) {
+            return;
+          }
+          final mobile = switch (defaultTargetPlatform) {
+            .android || .iOS || .fuchsia => true,
+            _ => false,
+          };
+          if (!mobile || event.kind != PointerDeviceKind.touch || kIsWeb) {
+            _fieldFocus.unfocus();
+          }
+        },
         onEditingComplete: widget.onEditingComplete,
         onSubmit: (value) {
           _popoverController.hide();
@@ -1452,7 +1503,14 @@ class _State<T> extends State<FAutocomplete<T>> with TickerProviderStateMixin {
               widget.contentOnTapHide?.call();
             },
             focusNode: _popoverFocus,
+            // Sportity fork patch — forward the field's groupId so the popover
+            // stays in the same text-field tap region group when a custom
+            // groupId is set (TextFieldTapRegion otherwise defaults to
+            // EditableText, splitting the field and popover into different
+            // groups and making every popover tap fire the field's
+            // onTapOutside). Upstream bug; PR-worthy on its own.
             popoverBuilder: (_, popoverController) => TextFieldTapRegion(
+              groupId: widget.groupId,
               child: InheritedAutocompleteController<T>(
                 popover: popoverController,
                 format: widget.format,
