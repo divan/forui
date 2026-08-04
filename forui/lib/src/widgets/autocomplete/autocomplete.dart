@@ -1380,10 +1380,23 @@ class _State<T> extends State<FAutocomplete<T>> with TickerProviderStateMixin {
     // Focus gained by taps are tracked using this Listener. We cannot use FTextField's onTap method since it is called
     // AFTER its focus change callback. Subsequently the entire text is selected in the focus change callback only if
     // it is not caused by a tap.
+    // Sportity fork patch — see PATCHES.md ("Autocomplete: web focus on the
+    // semantic-tap path"). Requests focus explicitly at pointerDown and in
+    // FTextFormField.onTap below.
+    //
+    // Why it's needed: on Flutter Web a tap delivered through the
+    // accessibility/semantics layer (assistive tech, Maestro Web) invokes the
+    // field's onTap WITHOUT first establishing EditableText focus. The popover
+    // opens, but typing never reaches the controller — the field looks filled
+    // (the DOM input holds the text) while the suggestion list stays
+    // unfiltered, and the value is discarded when the popover hides. The
+    // ordinary pointer path is unaffected because Flutter focuses on the first
+    // pointerDown.
     return Listener(
       onPointerDown: (_) {
         if (!_fieldFocus.hasFocus) {
           _tapFocus = true;
+          _fieldFocus.requestFocus();
         }
       },
       child: FTextFormField(
@@ -1416,7 +1429,14 @@ class _State<T> extends State<FAutocomplete<T>> with TickerProviderStateMixin {
         showCursor: widget.showCursor,
         maxLength: widget.maxLength,
         maxLengthEnforcement: widget.maxLengthEnforcement,
-        onTap: _toggle,
+        // Sportity fork patch — the semantic-tap path reaches onTap without
+        // having focused the field; see the Listener above for the rationale.
+        onTap: () {
+          if (!_fieldFocus.hasFocus) {
+            _fieldFocus.requestFocus();
+          }
+          _toggle();
+        },
         onTapAlwaysCalled: true,
         onEditingComplete: widget.onEditingComplete,
         onSubmit: (value) {
