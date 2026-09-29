@@ -36,5 +36,10 @@ test/**/*_test.mocks.dart
 .i10n.txt
 
 ## Generated Dart files
-**.control.dart
-**.design.dart
+# Sportity fork: tracked-in-VCS so the package is consumable as a `git:`
+# pub dependency. Upstream excludes these because pub.dev's publish step
+# bundles build_runner output into the archive; that path isn't taken
+# for git deps. Re-run `dart run build_runner build` in `forui/` after
+# pulling/rebasing to refresh.
+# **.control.dart
+# **.design.dart
