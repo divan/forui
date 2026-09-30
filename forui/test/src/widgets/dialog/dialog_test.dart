@@ -67,6 +67,44 @@ void main() {
 
       expect(find.text('Are you absolutely sure?'), findsNothing);
     });
+
+    for (final filter in [true, false]) {
+      testWidgets('tap on barrier asks the route first (filter: $filter)', (tester) async {
+        var asked = 0;
+        await tester.pumpWidget(
+          TestScaffold.app(
+            alignment: .topCenter,
+            child: Builder(
+              builder: (context) => FButton(
+                onPress: () => showFDialog(
+                  context: context,
+                  routeStyle: filter ? const .context() : .delta(barrierFilter: () => null),
+                  builder: (context, _, animation) => PopScope(
+                    canPop: false,
+                    onPopInvokedWithResult: (didPop, _) => asked++,
+                    child: FDialog.adaptive(
+                      animation: animation,
+                      horizontalBuilder: _confirmation,
+                      verticalBuilder: _confirmation,
+                    ),
+                  ),
+                ),
+                child: const Text('button'),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('button'));
+        await tester.pumpAndSettle();
+
+        await tester.tapAt(const Offset(20, 20));
+        await tester.pumpAndSettle();
+
+        expect(asked, 1);
+        expect(find.text('Are you absolutely sure?'), findsOneWidget);
+      });
+    }
   });
 
   group('FDialog', () {

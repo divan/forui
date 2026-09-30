@@ -84,6 +84,31 @@ widget tests pass with it applied.
 with reproducible steps, then propose this patch (or a more targeted
 fix inside `FAnimatedModalBarrier`) as a PR.
 
+### 2. `FDialogRoute`: a barrier tap asks the route before closing
+
+**Symptom:** A dialog that guards its close with `PopScope(canPop: false)`
+(to confirm discarding unsaved edits) is still closed by a tap outside it.
+Escape and system back respect the guard; the barrier does not.
+
+**Cause:** `FDialogRoute.buildModalBarrier` dismisses with
+`Navigator.pop(context)`, which pops unconditionally. Flutter's own
+`ModalBarrier` dismisses with `Navigator.maybePop`, which consults the
+route's `PopScope`s first.
+
+**Fix:** `Navigator.maybePop(context)` in both barrier branches (with and
+without a `barrierFilter`). A dialog without a `PopScope` closes exactly as
+before. Tests: `test/src/widgets/dialog/dialog_test.dart`, "tap on barrier
+asks the route first" (both branches).
+
+Consumer: SDS `showSSmartDialog(onCloseRequest:)`, which relies on every
+way out of a guarded dialog reaching its `PopScope`.
+
+`FModalSheet`'s barrier (`sheet/modal_sheet.dart`) has the same
+`Navigator.pop` and is left as is: nothing in SDS guards a sheet yet.
+
+**Upstream PR:** *not yet filed.* Small and self-contained — a good first
+one to send.
+
 ## Generated files commit
 
 Upstream excludes `**.design.dart` / `**.control.dart` from VCS because

@@ -150,7 +150,7 @@ class FDialogRoute<T> extends RawDialogRoute<T> {
         builder: (context) => FAnimatedModalBarrier(
           animation: animation!.drive(CurveTween(curve: barrierCurve)),
           filter: style.barrierFilter,
-          onDismiss: barrierDismissible ? () => Navigator.pop(context) : null,
+          onDismiss: barrierDismissible ? () => Navigator.maybePop(context) : null,
           semanticsLabel: barrierLabel,
           // changedInternalState is called if barrierLabel updates
           barrierSemanticsDismissible: semanticsDismissible,
@@ -161,7 +161,7 @@ class FDialogRoute<T> extends RawDialogRoute<T> {
       barrier = Builder(
         builder: (context) => FModalBarrier(
           filter: null,
-          onDismiss: barrierDismissible ? () => Navigator.pop(context) : null,
+          onDismiss: barrierDismissible ? () => Navigator.maybePop(context) : null,
           semanticsLabel: barrierLabel,
           // changedInternalState is called if barrierLabel updates
           barrierSemanticsDismissible: semanticsDismissible,
